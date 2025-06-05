@@ -1,41 +1,72 @@
 <template>
-  <section class="p-4">
-    <h1 class="text-2xl font-bold mb-4">Tus tareas</h1>
+  <div class="min-h-screen bg-[url('src/assets/img/retro-2.jpg')] bg-cover bg-center flex items-center justify-center font-retro p-6">
+   
+    <div class="w-full max-w-sm bg-white/60 backdrop-blur-md rounded-lg shadow-lg p-6">
 
-    <!-- Formulario para agregar tarea -->
-    <form @submit.prevent="addTask" class="mb-4">
-      <input
-        v-model="newTaskTitle"
-        type="text"
-        placeholder="Nueva tarea"
-        class="input"
-        required
-      />
-      <button type="submit" class="btn">Agregar tarea</button>
-    </form>
+      <div class="flex justify-between items-center bg-black bg-opacity-50 border-b-2 border-gray-600 px-4 py-2 rounded-t-lg">
+        <span class="text-sm text-white">Mis Tareas.exe</span>
+        <button @click="logout" class="bg-transparent text-white px-2 text-xs border border-white rounded hover:bg-gray-700">
+          X
+        </button>
+      </div>
 
-    <!-- Mostrar mensaje si no hay tareas -->
-    <p v-if="tasks && tasks.length === 0" class="text-gray-500">
-      No tienes tareas pendientes.
-    </p>
+      <!-- Contenido de las tareas -->
+      <div class="p-5 space-y-4">
 
-    <!-- Lista de tareas -->
-    <ul>
-      <TodoItem v-for="task in tasks" :key="task.id" :task="task" />
-    </ul>
-  </section>
+        <!-- Formulario para agregar tarea -->
+        <form @submit.prevent="addTask" class="mb-4 space-y-2">
+          <input
+            v-model="newTaskTitle"
+            type="text"
+            placeholder="Nueva tarea"
+            class="w-full px-4 py-2 border-1 border-gray-600 rounded-md bg-neutral-600 text-white placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-600"
+            required
+          />
+          <button
+            type="submit"
+            class="w-full bg-black text-white py-2 rounded-md hover:bg-gray-700 transition text-sm"
+          >
+            Agregar tarea
+          </button>
+        </form>
+
+        <!-- Mostrar mensaje si no hay tareas -->
+        <p v-if="tasks && tasks.length === 0" class="text-sm text-gray-400 text-center">
+          No tienes tareas pendientes.
+        </p>
+
+        <!-- Lista de tareas -->
+        <ul class="space-y-2">
+          <TodoItem
+            v-for="task in tasks"
+            :key="task.id"
+            :task="task"
+            @deleted="handleDelete"
+            @updated="fetchTasks"
+            class="bg-white/30 border-2 border-gray-600 rounded-lg p-3 text-white"
+          />
+        </ul>
+        <!-- Referencia de colores y tachado -->
+        <div class="text-sm text-gray-600 mt-4">
+          <p><span class="text-gray-800">Negro:</span> Tareas pendientes</p>
+          <p><span class="text-blue-600">Azul:</span> Tareas en progreso</p>
+          <p><span class="line-through text-gray-700">Tachado:</span> Tareas completadas</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from "vue";
-import TodoForm from "@/components/TodoForm.vue"; // Importa el componente TodoForm
+import { useRouter } from 'vue-router'
 import TodoItem from "@/components/TodoItem.vue";
 import { supabase } from "@/lib/supabase";
 
-const tasks = ref([]); // Lista de tareas
-const newTaskTitle = ref(""); // Título de la nueva tarea
+const tasks = ref([]);
+const newTaskTitle = ref("");
+const router = useRouter();
 
-// Función para obtener las tareas del usuario logueado
 const fetchTasks = async () => {
   const {
     data: { session },
@@ -53,20 +84,29 @@ const fetchTasks = async () => {
     const { data, error } = await supabase
       .from("tasks")
       .select("*")
-      .eq("user_id", userId); // Filtrar por el user_id
+      .eq("user_id", userId);
+
     if (error) {
       console.error("Error al cargar tareas:", error);
     } else {
-      tasks.value = data; // Actualizamos las tareas en la lista
-
-      // Console log para ver las tareas que se cargan
-      console.log("Tareas cargadas para el usuario con ID:", userId);
-      console.log("Tareas:", tasks.value); // Ver qué tareas son cargadas
+      tasks.value = data;
     }
   }
 };
 
-// Función para agregar una nueva tarea
+const logout = async () => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error('Error al cerrar sesión:', error.message);
+    } else {
+      router.push('/logout');
+    }
+  } catch (error) {
+    console.error('Error al intentar cerrar sesión:', error);
+  }
+};
+
 const addTask = async () => {
   const {
     data: { session },
@@ -83,26 +123,21 @@ const addTask = async () => {
   if (userId) {
     const { error } = await supabase
       .from("tasks")
-      .insert([{ name: newTaskTitle.value, user_id: userId }]); // sin pasar "id"
+      .insert([{ name: newTaskTitle.value, user_id: userId }]);
 
     if (error) {
       console.error("Error al agregar tarea:", error);
     } else {
-      newTaskTitle.value = ""; // Limpiar el campo de entrada
-      fetchTasks(); // Recargar las tareas
+      newTaskTitle.value = "";
+      fetchTasks();
     }
   }
 };
 
-// Cargar las tareas cuando el componente se monta
+const handleDelete = (deletedTaskId) => {
+  tasks.value = tasks.value.filter((task) => task.id !== deletedTaskId);
+};
+
 onMounted(fetchTasks);
 </script>
 
-<style scoped>
-.input {
-  @apply w-full px-4 py-2 border rounded;
-}
-.btn {
-  @apply w-full bg-green-600 text-white py-2 rounded hover:bg-green-700;
-}
-</style>
